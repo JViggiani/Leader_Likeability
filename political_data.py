@@ -43,9 +43,9 @@ class Party(Enum):
             return Party.DK
         elif label == "UNKNOWN":
             return Party.UNKNOWN
+        elif label == "SPK":
+            return Party.OTHER
         else:
-            if label == "SPK":
-                return Party.OTHER
             print(label)
             raise NotImplementedError
     
@@ -57,6 +57,67 @@ class Leader(Enum):
     PRICE = 5
     FARAGE = 6
     BARTLEYBERRY = 7
+    STARMER = 21
+    DAVEY = 31
+    MORAN = 32
+    
+    @staticmethod
+    def from_str(label):
+        label = label.upper()
+        if label == "JOHNSON":
+            return Leader.JOHNSON
+        elif label == "CORBYN":
+            return Leader.CORBYN
+        elif label == "SWINSON":
+            return Leader.SWINSON
+        elif label == "STURGEON":
+            return Leader.STURGEON
+        elif label == "PRICE":
+            return Leader.PRICE
+        elif label == "FARAGE":
+            return Leader.FARAGE
+        elif label == "BARTLEYBERRY":
+            return Leader.BARTLEYBERRY
+        elif label == "STARMER":
+            return Leader.STARMER
+        elif label == "DAVEY":
+            return Leader.DAVEY
+        elif label == "MORAN":
+            return Leader.MORAN
+        else:
+            raise NotImplementedError
+    
+    @staticmethod
+    def get_party(leader):
+        if leader == Leader.JOHNSON:
+            return Party.CON
+        elif leader == Leader.CORBYN or leader == Leader.STARMER:
+            return Party.LAB
+        elif leader == Leader.SWINSON or leader == Leader.DAVEY or leader == Leader.MORAN:
+            return Party.LD
+        elif leader == Leader.STURGEON:
+            return Party.SNP
+        elif leader == Leader.PRICE:
+            return Party.PC
+        elif leader == Leader.FARAGE:
+            return Party.BREXIT
+        elif leader == Leader.BARTLEYBERRY:
+            return Party.GREEN
+        else:
+            print(str(leader))
+            raise NotImplementedError
+            
+    def __lt__(self, other):
+        if self.value < other.value:
+            return True
+        else:
+            return False
+        
+    def __gt__(self, other):
+        if self.value > other.value:
+            return True
+        else:
+            return False
     
 class Region(Enum):
     EAST_MIDLANDS = 1
