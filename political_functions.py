@@ -8,21 +8,7 @@ import statistics
 import logging
 import csv
 from political_data import Party, Region, Leader
-from political_utility_functions import format_region
-
-def find_wave(row):
-    #Need to calculate the latest wave
-    for wave in range(19, 0, -1):
-        if "wave" + str(wave) in row:
-            wavevalue = row["wave" + str(wave)]
-            #print("Wave: " + str(wave))
-            #print("Wavestring: " + "wave" + str(wave))
-            #print("Wavevalue: " + wavevalue)
-            if wavevalue != " " and int(wavevalue) == 1:
-                return wave
-    #If we finish the iterationw ithout finding the latest constituency, we have no wave data and must discard the entry when returning 0
-    #print(row)
-    return 0
+from political_utility_functions import format_region, zero_negatives
 
 def get_weight(row):
     weight_column_name = ""
@@ -175,7 +161,60 @@ def calculate_swing_2024(row, party):
                 largest_nonparty_count = row[item]
     return (party_count - largest_nonparty_count) / 2
 
-def project(libdem_leader, labour_leader, config, region_leader_fittings, regional_leader_likeability_votes):
+def normalise_vote_shares(leader_vote_shares):
+    #Normalise vote shares
+    sum_vote_shares = sum(leader_vote_shares.values())
+    if sum_vote_shares == 0:
+        raise Exception("No vote shares recorded for this constituency.")
+    else:
+        for leader in leader_vote_shares:
+            leader_vote_shares[leader] = float(leader_vote_shares[leader] / sum_vote_shares)
+            
+    return leader_vote_shares
+    
+
+def project(config, region_leader_fittings, regional_leader_likeability_votes):
+    
+    electiondata_2019 = open(config['InputDataFiles']['ElectionResults2019'])
+    csv_electiondata_2019 = csv.DictReader(electiondata_2019)
+    
+    constituency_likeability_conversion_factor = {}
+    
+    for row in csv_electiondata_2019:
+        if format_region(row['country_name']) == Region.NORTHERN_IRELAND.name:
+            logging.debug("Skipping Northern Irish seats")
+            continue
+        
+        constituency_likeability_conversion_factor[row["constituency_name"]] = {}
+        
+        region = Region.from_str(format_region(row["region_name"]))
+        
+        likeability_model_leader_vote_shares = {}
+        
+        for leader_2019 in region_leader_fittings[region]:
+            if (leader_2019 == Leader.STURGEON and region != Region.SCOTLAND) or (leader_2019 == Leader.PRICE and region != Region.WALES):
+                continue
+            
+            constituency_likeability_conversion_factor[row["constituency_name"]][leader_2019] = 0
+    
+            m = region_leader_fittings[region][leader_2019][0]
+            b = region_leader_fittings[region][leader_2019][1]
+    
+            implied_vote_share_2024_unnormalised = 0
+            if row["constituency_name"] in regional_leader_likeability_votes[Region.from_str(row["region_name"])][leader_2019]:
+                likeability_data = regional_leader_likeability_votes[Region.from_str(row["region_name"])][leader_2019][row["constituency_name"]]
+                constituency_leader_likeability = likeability_data[0]
+                implied_vote_share_2024_unnormalised = (m * constituency_leader_likeability) + b
+            likeability_model_leader_vote_shares[leader_2019] = implied_vote_share_2024_unnormalised
+                
+        likeability_model_leader_vote_shares = normalise_vote_shares(likeability_model_leader_vote_shares)
+                
+        for leader in constituency_likeability_conversion_factor[row["constituency_name"]]:
+            constituency_likeability_conversion_factor[row["constituency_name"]][leader] = (int(row[Leader.get_party(leader).name.lower()]) / int(row["valid_votes"])) - likeability_model_leader_vote_shares[leader] 
+    
+    return constituency_likeability_conversion_factor
+
+def project_2024(libdem_leader, labour_leader, config, region_leader_fittings, regional_leader_likeability_votes, constituency_offset):
     
     electiondata_2019 = open(config['InputDataFiles']['ElectionResults2019'])
     csv_electiondata_2019 = csv.DictReader(electiondata_2019)
@@ -205,7 +244,7 @@ def project(libdem_leader, labour_leader, config, region_leader_fittings, region
             continue
         region = Region.from_str(format_region(row["region_name"]))
         
-        leader_vote_shares = {}
+        likeability_model_leader_vote_shares = {}
         
         for leader_2019 in region_leader_fittings[region]:
             if (leader_2019 == Leader.STURGEON and region != Region.SCOTLAND) or (leader_2019 == Leader.PRICE and region != Region.WALES):
@@ -225,19 +264,26 @@ def project(libdem_leader, labour_leader, config, region_leader_fittings, region
                 likeability_data = regional_leader_likeability_votes[Region.from_str(row["region_name"])][leader_2024][row["constituency_name"]]
                 constituency_leader_likeability = likeability_data[0]
                 implied_vote_share_2024_unnormalised = (m * constituency_leader_likeability) + b
-            leader_vote_shares[leader_2024] = implied_vote_share_2024_unnormalised
+            likeability_model_leader_vote_shares[leader_2024] = implied_vote_share_2024_unnormalised
                 
-        #Normalise vote shares
-        sum_vote_shares = sum(leader_vote_shares.values())
-        if sum_vote_shares == 0:
-            raise Exception("No vote shares recorded for constituency: " + row["constituency_name"])
-        else:
-            for leader in leader_vote_shares:
-                leader_vote_shares[leader] = float(leader_vote_shares[leader] / sum_vote_shares)
-                
+        likeability_model_leader_vote_shares = normalise_vote_shares(likeability_model_leader_vote_shares)    
     
+        fixed_model_leader_vote_shares = {}
+        
+        for leader_2024 in likeability_model_leader_vote_shares:
+            leader_2019 = leader_2024
+            if leader_2019 == Leader.STARMER:
+                leader_2019 = Leader.CORBYN
+            if leader_2019 == Leader.MORAN or leader_2019 == Leader.DAVEY:
+                leader_2019 = Leader.SWINSON
+            fixed_model_leader_vote_shares[leader_2024] = likeability_model_leader_vote_shares[leader_2024] + constituency_offset[row["constituency_name"]][leader_2019]
+    
+        fixed_model_leader_vote_shares = zero_negatives(fixed_model_leader_vote_shares)
+        
+        fixed_model_leader_vote_shares = normalise_vote_shares(fixed_model_leader_vote_shares)    
+        
         logging.info("Implied vote values for constituency " + row["constituency_name"])
-        log_nested_dictionary(leader_vote_shares)
+        log_nested_dictionary(fixed_model_leader_vote_shares)
         
         LD_swing_2019 = calculate_swing(row, Party.LD)
         row['ld_swing_2019'] = LD_swing_2019
@@ -248,7 +294,7 @@ def project(libdem_leader, labour_leader, config, region_leader_fittings, region
         fieldnames.append('second_party_2024')
         '''
         
-        row['first_party_2024'] = Leader.get_party(max(leader_vote_shares, key=leader_vote_shares.get)).name.upper()
+        row['first_party_2024'] = Leader.get_party(max(fixed_model_leader_vote_shares, key=fixed_model_leader_vote_shares.get)).name.upper()
         row['first_party'] = row['first_party'].upper()
         
         #sorted_temp_leader_vote_shares = sorted(leader_vote_shares.items(),key=(lambda i: i[1]))
@@ -256,7 +302,7 @@ def project(libdem_leader, labour_leader, config, region_leader_fittings, region
         #find second party
         #row['second_party_2024'] = Leader.get_party(Leader.from_str(sorted_temp_leader_vote_shares[-3][0].name.upper())).name.upper()
         
-        list_of_results_tuples = list(leader_vote_shares.items())
+        list_of_results_tuples = list(fixed_model_leader_vote_shares.items())
         list_of_results_tuples = [(sub[1], sub[0]) for sub in list_of_results_tuples] 
         list_of_results_tuples.sort()
         row['second_party_2024'] = Leader.get_party(list_of_results_tuples[-2][1]).name
@@ -284,7 +330,7 @@ def project(libdem_leader, labour_leader, config, region_leader_fittings, region
             elif leader_iterator == Leader.STARMER and labour_leader != Leader.STARMER:
                 continue
             else:
-                row[Leader.get_party(leader_iterator).name.lower() + '_share_2024'] = leader_vote_shares[leader_iterator]
+                row[Leader.get_party(leader_iterator).name.lower() + '_share_2024'] = fixed_model_leader_vote_shares[leader_iterator]
         
         row['ld_swing_2024'] = calculate_swing_2024(row, Party.LD)
         

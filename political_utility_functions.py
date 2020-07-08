@@ -30,3 +30,9 @@ def to_serializable(val):
 
 def get_num(x):
     return int(''.join(ele for ele in x if ele.isdigit()))
+
+def zero_negatives(dictionary):
+    for item in dictionary:
+        if dictionary[item] < 0:
+            dictionary[item] = 0
+    return dictionary
