@@ -17,10 +17,12 @@ import statsmodels.api as sm
 import numpy as np
 import pylab
 import pandas as pd
+import json
+import jsonpickle
 from sklearn.linear_model import LinearRegression
 from political_data import Party, Leader, Region
-from political_functions import get_likeability_data_of_leader, get_constituency_column_name, find_wave, calculate_sum_weight, log_nested_dictionary, calculate_constituency_likeability, calculate_swing, calculate_swing_2024, project_libdem_2024
-from political_utility_functions import format_constituency, format_region
+from political_functions import get_likeability_data_of_leader, get_constituency_column_name, find_wave, calculate_sum_weight, log_nested_dictionary, calculate_constituency_likeability, calculate_swing, calculate_swing_2024, project
+from political_utility_functions import format_constituency, format_region, to_serializable, get_num
 
 start_time = time.time()
 
@@ -101,7 +103,15 @@ for polling_data_file in polling_data_files:
             continue
 
         region_from_file = Region.from_str(regions_and_constituencies[row[constituency_column_name]][1])
+        
+        party_leanings = Party.from_party_id(int(row["partyId"])) 
         party_voted_from_file = Party(int(row["p_past_vote_2019"])) 
+        
+        # For some reason, in wave 19, nobody was recorded to have voted for the Brexit party. 
+        # Despite 32,000+ responses in the survey and BXT getting 2% of the vote, nobody could be found?? Strange. 
+        # I will instead measure their sentiments by those who said they lean towards them
+        if party_leanings == Party.BREXIT:
+            party_voted_from_file = party_leanings
         
         if party_voted_from_file not in region_likeability[region_from_file]:
             logging.debug("Party " + str(party_voted_from_file) + " is not active in region " + str(region_from_file)  + ". Discarding.")
@@ -121,13 +131,36 @@ for polling_data_file in polling_data_files:
     
     #print("==End region likeability==")
     #print(region_likeability)
-    sum_weight = calculate_sum_weight(region_likeability)
-    logging.info("Current sum of weight: " + str(sum_weight))
+    #sum_weight = calculate_sum_weight(region_likeability)
+    #logging.info("Current sum of weight: " + str(sum_weight))
 
 #logging.info("\n" + yaml.dump(region_likeability, default_flow_style=False))
+logging.info("Finished likeability parsing. Saving into json")
 log_nested_dictionary(region_likeability)
 sum_weight = calculate_sum_weight(region_likeability)
 logging.info("Sum of weight: " + str(sum_weight))
+#with open(config['OutputDataFiles']['LikeabilityJson'], "w") as jsonfile:
+#    json.dump(jsonfile, region_likeability, default=to_serializable)
+    
+with open(config['OutputDataFiles']['LikeabilityJson'], "w") as out_likeability_json:
+    region_likeability_json = jsonpickle.encode(region_likeability)
+    json.dump(region_likeability_json, out_likeability_json)
+    
+region_likeability_string=''
+with open(config['InputDataFiles']['LikeabilityJson'], "r") as in_likeability_json:
+    region_likeability_string = json.load(in_likeability_json)
+region_likeability_str = jsonpickle.decode(region_likeability_string)
+region_likeability = {}
+for region_str in region_likeability_str:
+    region = Region(get_num(region_str))
+    region_likeability[region] = {}
+    for party_str in region_likeability_str[region_str]:
+        party = Party(get_num(party_str))
+        region_likeability[region][party] = {}
+        for leader_str in region_likeability_str[region_str][party_str]:
+            leader = Leader(get_num(leader_str))
+            region_likeability[region][party][leader] = region_likeability_str[region_str][party_str][leader_str]
+log_nested_dictionary(region_likeability)
 
 electiondata_2019 = open(config['InputDataFiles']['ElectionResults2019'])
 csv_electiondata_2019 = csv.DictReader(electiondata_2019)
@@ -270,95 +303,10 @@ logging.info("Beginning constituency 2024 calculations.")
 
 # regional_leader_likeability_votes[region][leader][constituency]
 # contains data like #Returns a tuple: (average_likeability, party_to_calculate_for_vote_proportion, winning_party)
-project_libdem_2024(Leader.DAVEY, config, region_leader_fittings, regional_leader_likeability_votes)
-project_libdem_2024(Leader.MORAN, config, region_leader_fittings, regional_leader_likeability_votes)
+#project(Leader.DAVEY, Leader.STARMER, config, region_leader_fittings, regional_leader_likeability_votes)
+#project(Leader.MORAN, Leader.STARMER, config, region_leader_fittings, regional_leader_likeability_votes)
+project(Leader.SWINSON, Leader.CORBYN, config, region_leader_fittings, regional_leader_likeability_votes)
 
-'''
-for row in csv_electiondata_2019:
-    if format_region(row['country_name']) == Region.NORTHERN_IRELAND.name:
-        logging.debug("Skipping Northern Irish seats")
-        continue
-    region = Region.from_str(format_region(row["region_name"]))
-    
-    leader_vote_shares = {}
-    
-    for leader_2019 in region_leader_fittings[region]:
-        if (leader_2019 == Leader.STURGEON and region != Region.SCOTLAND) or (leader_2019 == Leader.PRICE and region != Region.WALES):
-            continue
-        leader_2024 = leader_2019
-        if leader_2019 == Leader.SWINSON:
-            leader_2024 = libdem_leader
-        elif leader_2019 == Leader.CORBYN:
-            leader_2024 = Leader.STARMER
-
-        m = region_leader_fittings[region][leader_2019][0]
-        b = region_leader_fittings[region][leader_2019][1]
-
-        implied_vote_share_2024_unnormalised = 0
-        if row["constituency_name"] in regional_leader_likeability_votes[Region.from_str(row["region_name"])][leader_2024]:
-            likeability_data = regional_leader_likeability_votes[Region.from_str(row["region_name"])][leader_2024][row["constituency_name"]]
-            constituency_leader_likeability = likeability_data[0]
-            implied_vote_share_2024_unnormalised = (m * constituency_leader_likeability) + b
-        leader_vote_shares[leader_2024] = implied_vote_share_2024_unnormalised
-    
-    #Normalise vote shares
-    sum_vote_shares = sum(leader_vote_shares.values())
-    if sum_vote_shares == 0:
-        raise Exception("No vote shares recorded for constituency: " + row["constituency_name"])
-    else:
-        for leader in leader_vote_shares:
-            leader_vote_shares[leader] = float(leader_vote_shares[leader] / sum_vote_shares)
-
-    logging.info("Implied vote values for constituency " + row["constituency_name"])
-    log_nested_dictionary(leader_vote_shares)
-    
-    LD_swing_2019 = calculate_swing(row, Party.LD)
-    row['ld_swing_2019'] = LD_swing_2019
-    
-    #fieldnames.append('result_2024')
-    #fieldnames.append('first_party_2024')
-    #fieldnames.append('second_party_2024')
-    
-    row['first_party_2024'] = Leader.get_party(max(leader_vote_shares, key=leader_vote_shares.get)).name.upper()
-    row['first_party'] = row['first_party'].upper()
-    
-    #sorted_temp_leader_vote_shares = sorted(leader_vote_shares.items(),key=(lambda i: i[1]))
-    
-    #find second party
-    #row['second_party_2024'] = Leader.get_party(Leader.from_str(sorted_temp_leader_vote_shares[-3][0].name.upper())).name.upper()
-    
-    list_of_results_tuples = list(leader_vote_shares.items())
-    list_of_results_tuples = [(sub[1], sub[0]) for sub in list_of_results_tuples] 
-    list_of_results_tuples.sort()
-    row['second_party_2024'] = Leader.get_party(list_of_results_tuples[-2][1]).name
-    
-    row['second_party'] = row['second_party'].upper()
-    
-    row['result'] = row['result'].upper()
-    new_result_string = ''
-    if row['first_party'] == row['first_party_2024']:
-        new_result_string = row['first_party'] + " HOLD"
-    else:
-        new_result_string = row['first_party_2024'] + " GAIN FROM " + row['first_party']
-    row['result_2024'] = new_result_string
-    
-    for leader_iterator in Leader:
-        if (leader_iterator == Leader.STURGEON and region != Region.SCOTLAND) or (leader_iterator == Leader.PRICE and region != Region.WALES):
-            continue
-        if leader_iterator == Leader.CORBYN or leader_iterator == Leader.SWINSON:
-            #old 2019 leaders, discard
-            continue
-        elif leader_iterator == Leader.DAVEY and libdem_leader != Leader.DAVEY:
-            continue
-        elif leader_iterator == Leader.MORAN and libdem_leader != Leader.MORAN:
-            continue
-        else:
-            row[Leader.get_party(leader_iterator).name.lower() + '_share_2024'] = leader_vote_shares[leader_iterator]
-    
-    row['ld_swing_2024'] = calculate_swing_2024(row, Party.LD)
-    
-    csv_targetdata_2024.writerow(row)
-'''
 
 print("Calculation performed in " + str(time.time() - start_time) + " seconds.")
 

@@ -170,17 +170,21 @@ def calculate_swing_2024(row, party):
             continue
         elif item.replace("_share_2024", "").upper() in Party.__members__:
             if item.replace("_share_2024", "").upper() == Party.LD.name:
-                party_count = row[item]
+                party_count = float(row[item])
             elif type(row[item]) == float and row[item] > largest_nonparty_count:
                 largest_nonparty_count = row[item]
     return (party_count - largest_nonparty_count) / 2
 
-def project_libdem_2024(libdem_leader, config, region_leader_fittings, regional_leader_likeability_votes):
+def project(libdem_leader, labour_leader, config, region_leader_fittings, regional_leader_likeability_votes):
     
     electiondata_2019 = open(config['InputDataFiles']['ElectionResults2019'])
     csv_electiondata_2019 = csv.DictReader(electiondata_2019)
     
-    targetdata_2024 = open(config['OutputDataFiles']['ElectionTargets2024' + libdem_leader.name], 'w', newline='')
+    #Build destination filepath name
+    base_file_name = config['OutputDataFiles']['ElectionProjection'].split('.')
+    file_name = base_file_name[0] + "_" + libdem_leader.name + "_" + labour_leader.name + '.' + base_file_name[1]
+    targetdata_2024 = open(file_name, 'w', newline='')
+    
     fieldnames = csv_electiondata_2019.fieldnames
     fieldnames.append('ld_swing_2019')
     fieldnames.append('result_2024')
@@ -211,7 +215,7 @@ def project_libdem_2024(libdem_leader, config, region_leader_fittings, regional_
             if leader_2019 == Leader.SWINSON:
                 leader_2024 = libdem_leader
             elif leader_2019 == Leader.CORBYN:
-                leader_2024 = Leader.STARMER
+                leader_2024 = labour_leader
     
             m = region_leader_fittings[region][leader_2019][0]
             b = region_leader_fittings[region][leader_2019][1]
@@ -222,7 +226,7 @@ def project_libdem_2024(libdem_leader, config, region_leader_fittings, regional_
                 constituency_leader_likeability = likeability_data[0]
                 implied_vote_share_2024_unnormalised = (m * constituency_leader_likeability) + b
             leader_vote_shares[leader_2024] = implied_vote_share_2024_unnormalised
-        
+                
         #Normalise vote shares
         sum_vote_shares = sum(leader_vote_shares.values())
         if sum_vote_shares == 0:
@@ -230,6 +234,7 @@ def project_libdem_2024(libdem_leader, config, region_leader_fittings, regional_
         else:
             for leader in leader_vote_shares:
                 leader_vote_shares[leader] = float(leader_vote_shares[leader] / sum_vote_shares)
+                
     
         logging.info("Implied vote values for constituency " + row["constituency_name"])
         log_nested_dictionary(leader_vote_shares)
@@ -269,12 +274,14 @@ def project_libdem_2024(libdem_leader, config, region_leader_fittings, regional_
         for leader_iterator in Leader:
             if (leader_iterator == Leader.STURGEON and region != Region.SCOTLAND) or (leader_iterator == Leader.PRICE and region != Region.WALES):
                 continue
-            if leader_iterator == Leader.CORBYN or leader_iterator == Leader.SWINSON:
-                #old 2019 leaders, discard
+            if (leader_iterator == Leader.CORBYN and labour_leader != Leader.CORBYN) or (leader_iterator == Leader.STARMER and labour_leader != Leader.STARMER) or (leader_iterator == Leader.SWINSON and libdem_leader != Leader.SWINSON) or (leader_iterator == Leader.DAVEY and libdem_leader != Leader.DAVEY) or (leader_iterator == Leader.MORAN and libdem_leader != Leader.MORAN):
+                #unused leaders, discard
                 continue
             elif leader_iterator == Leader.DAVEY and libdem_leader != Leader.DAVEY:
                 continue
             elif leader_iterator == Leader.MORAN and libdem_leader != Leader.MORAN:
+                continue
+            elif leader_iterator == Leader.STARMER and labour_leader != Leader.STARMER:
                 continue
             else:
                 row[Leader.get_party(leader_iterator).name.lower() + '_share_2024'] = leader_vote_shares[leader_iterator]

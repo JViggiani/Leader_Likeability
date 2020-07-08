@@ -48,6 +48,38 @@ class Party(Enum):
         else:
             print(label)
             raise NotImplementedError
+            
+    @staticmethod
+    def from_party_id(label):
+        if label == 1:
+            return Party.CON
+        elif label == 2:
+            return Party.LAB
+        elif label == 3:
+            return Party.LD
+        elif label == 4:
+            return Party.SNP
+        elif label == 5:
+            return Party.PC
+        elif label == 6:
+            return Party.OTHER
+        elif label == 7:
+            return Party.GREEN
+        elif label == 8:
+            return Party.OTHER
+        elif label == 9:
+            return Party.OTHER
+        elif label == 10:
+            return Party.OTHER
+        elif label == 11:
+            return Party.OTHER
+        elif label == 12:
+            return Party.BREXIT
+        elif label == 9999:
+            return Party.DK
+        else:
+            print(label)
+            raise NotImplementedError
     
 class Leader(Enum):
     JOHNSON = 1
