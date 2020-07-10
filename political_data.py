@@ -80,6 +80,24 @@ class Party(Enum):
         else:
             print(label)
             raise NotImplementedError
+            
+    @staticmethod
+    def get_colour_hex(party):
+        if party == Party.CON:
+            return "#0087dc" #conservative blue
+        elif party == Party.LAB:
+            return "#d50000" #labour red
+        elif party == Party.LD:
+            return "#FDBB30" #libdem orange         
+        elif party == Party.GREEN:
+            return "#008066" #green green
+        elif party == Party.SNP:
+            return "#FFF95D" #snp yellow
+        elif party == Party.PC:
+            return "#3F8428" #plaid green
+        else:
+            return "0.75" #grey
+
     
 class Leader(Enum):
     JOHNSON = 1

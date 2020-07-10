@@ -335,3 +335,4 @@ def project_2024(libdem_leader, labour_leader, config, region_leader_fittings, r
         row['ld_swing_2024'] = calculate_swing_2024(row, Party.LD)
         
         csv_targetdata_2024.writerow(row)
+        
