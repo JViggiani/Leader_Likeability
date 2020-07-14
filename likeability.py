@@ -13,23 +13,105 @@ import logging
 import os
 import json
 import jsonpickle
+import statistics
 from political_data import Party, Leader, Region
-from political_functions import get_likeability_data_of_leader, calculate_sum_weight, log_nested_dictionary
-from political_utility_functions import format_constituency, format_region
+from political_utility_functions import format_constituency, format_region, log_nested_dictionary
 
+###     GLOBAL ITEMS
 start_time = time.time()
 
 config = configparser.ConfigParser()
 config.read('config.ini')
 
+###    END GLOBAL ITEMS
+
+###    CONFIG
 log_file_name = "likeability.log"
 if os.path.exists(log_file_name):
   os.remove(log_file_name)
 logging.basicConfig(filename=log_file_name,level=logging.DEBUG)
+###    END CONFIG
 
-polling_data_files = config['InputDataFiles']['PollingDataWaves'].split(',')
+###    FUNCTION DEFINITIONS
+def get_weight(row):
+    weight_column_name = ""
+    if "wt" in row:
+        weight_column_name = "wt"
+    elif "wt_new_W17W18W19" in row:
+        weight_column_name = "wt_new_W17W18W19"
+    else:
+        raise Exception("Failed to find weight column")
+    
+    weight_string = row[weight_column_name]
+    if not weight_string or weight_string == " ":
+        logging.debug("Failed to find any weighting data for column: " + weight_column_name + ". Returning 0 weight.")
+        return 0
+    else:
+        if weight_string.startswith("."):
+            weight_string = "0" + weight_string
+        return float(weight_string)
 
-constituencies = open(config['InputDataFiles']['Constituencies'])
+def get_leader_likeability_column_names(row, leader):
+    if leader == Leader.BARTLEYBERRY:
+        basic_leader_likeability_column_name_Bartley = "likeBartley"
+        basic_leader_likeability_column_name_Berry = "likeBerry"
+        if basic_leader_likeability_column_name_Bartley  in row:
+            return [basic_leader_likeability_column_name_Bartley, basic_leader_likeability_column_name_Berry]
+        else:
+            raise Exception("Failed to find column name: " + basic_leader_likeability_column_name_Bartley)
+    else:
+        basic_leader_likeability_column_name = "like" + leader.name[0].upper() + leader.name[1:].lower()
+        if basic_leader_likeability_column_name  in row:
+            return [basic_leader_likeability_column_name]
+        else:
+            raise Exception("Failed to find column name: " + basic_leader_likeability_column_name)
+
+#These rows are those from the polling data, not the results of the 2019 election
+def get_likeability_data_of_leader(row, current_likeability_list, leader):
+    logging.debug("Entering likeability function")
+    weight = get_weight(row)
+    logging.debug("Row weight " + str(weight))
+    
+    this_weighted_likeability = 0
+    
+    #The below is set up in quite a confusing way because sometimes parties can have multiple leaders. 
+    #Strictly we aren't calculating "leader likeability for each leader" but instead "party leadership likeability"
+    #   so instead we find the leader(s) of a party, weight the responses and average them to find eg the Green 
+    #   party leadership likeability
+    leader_column_names = get_leader_likeability_column_names(row, leader)
+    logging.debug("Leader likeability column name(s) for leader " + leader.name + " are: " + str(leader_column_names))
+    if leader_column_names:
+        this_weighted_likeability_leader_list = []
+        for leader_column_name in leader_column_names:
+            if row[leader_column_name] != " " and int(row[leader_column_name]) >= 0 and int(row[leader_column_name]) <= 10:
+                this_weighted_likeability_leader_list.append(weight * int(row[leader_column_name]))
+            else:
+                logging.debug("Failed to find valid likeability data for column: " + leader_column_name)
+        if not this_weighted_likeability_leader_list:
+            logging.debug("Failed to find valid likeability data. Returning [0, 0]")
+            return [0, 0]
+        else:
+            logging.debug("Found likeability data. Will assess the average likeability of: " + str(this_weighted_likeability_leader_list))
+            this_weighted_likeability = statistics.mean(this_weighted_likeability_leader_list)
+
+    return [this_weighted_likeability, weight]
+
+def calculate_sum_weight(region_likeability):
+    sum_weight = 0
+    for region in region_likeability:
+        for party_voted in region_likeability[region]:
+            for leader_opinion in region_likeability[region][party_voted]:
+                sum_weight = sum_weight + region_likeability[region][party_voted][leader_opinion][1]
+    return sum_weight
+###    END FUNCTION DEFINITIONS
+
+#################################################################################################################################
+    
+###    SCRIPT
+
+polling_data_files = config['Likeability_Input']['PollingDataWaves'].split(',')
+
+constituencies = open(config['Likeability_Input']['Constituencies'])
 csv_constituencies = csv.DictReader(constituencies)
 
 print("Initialising constituency reference dictionary")
@@ -133,9 +215,10 @@ logging.info("Sum of weight: " + str(sum_weight))
 #    json.dump(jsonfile, region_likeability, default=to_serializable)
     
 #This prints everything to one line. With a complex data structure like this I am not sure how to properly format it. But it does the job in reducing computational time for the next scripts
-with open(config['OutputDataFiles']['LikeabilityJson'], "w") as out_likeability_json:
+#   TODO: make me human readable for neatness
+with open(config['Likeability_Output']['LikeabilityJson'], "w") as out_likeability_json:
     region_likeability_pickle = jsonpickle.encode(region_likeability)
-    json.dump(region_likeability_pickle, out_likeability_json, indent=4, sort_keys=True, separators=(',', ': '))
+    json.dump(region_likeability_pickle, out_likeability_json, indent=4, separators=(',', ': '))
     
 print("Finished generating likeability json from polling data.")
 logging.info("Finished generating likeability json from polling data.")

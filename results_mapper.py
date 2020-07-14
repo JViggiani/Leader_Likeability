@@ -30,6 +30,7 @@ import os
 import pandas as pd
 import geopandas as gpd
 import matplotlib.pyplot as plt
+from matplotlib import colors
 
 start_time = time.time()
 
@@ -41,7 +42,7 @@ logging.basicConfig(filename=log_file_name,level=logging.DEBUG)
 config = configparser.ConfigParser()
 config.read('config.ini')
 
-input_file_names = config['InputDataFiles']['ElectionProjections'].split(',')
+input_file_names = config['Mapper_Input']['ElectionProjections'].split(',')
 input_file_davey = ''
 input_file_moran = ''
 for filename in input_file_names:
@@ -59,7 +60,7 @@ data_df_moran = pd.read_csv(input_file_moran, skipinitialspace=True)
 data_df_davey.fillna(0, inplace=True)
 data_df_moran.fillna(0, inplace=True)
 
-map_df = gpd.read_file(config["InputDataFiles"]["Shapefile"])
+map_df = gpd.read_file(config["Mapper_Input"]["Shapefile"])
 # map_df is a Pandas dataframe
 
 # Combine the two dataframes by their constituencies
@@ -73,28 +74,32 @@ combined_moran.fillna(0, inplace=True)
 #    print(combined_davey)
 
 ##start map
+colors.DivergingNorm(vmin=-0.5, vcenter=0, vmax=0.5)
+
 fig, ax = plt.subplots(1, figsize=(60, 60))
-combined_davey.plot(column="ld_share_2024", cmap="viridis", 
+combined_davey.plot(column="ld_swing_2024", cmap="coolwarm", 
                    linewidth=0.8, ax=ax)
 ax.axis("off")
 
-vmin = 0.
-vmax = 100.
-sm = plt.cm.ScalarMappable(cmap="viridis")
+vmin = -0.5
+vmax = 0.5
+sm = plt.cm.ScalarMappable(cmap="coolwarm")
 sm._A = []
 cbar = fig.colorbar(sm)
 plt.savefig('davey.png')
 ##end map
 
 ##start map
+colors.DivergingNorm(vmin=-0.5, vcenter=0, vmax=0.5)
+
 fig, ax = plt.subplots(1, figsize=(60, 60))
-combined_moran.plot(column="ld_share_2024", cmap="viridis", 
+combined_moran.plot(column="ld_swing_2024", cmap="coolwarm", 
                    linewidth=0.8, ax=ax)
 ax.axis("off")
 
-vmin = 0.
-vmax = 100.
-sm = plt.cm.ScalarMappable(cmap="viridis")
+vmin = -0.5
+vmax = 0.5
+sm = plt.cm.ScalarMappable(cmap="coolwarm")
 sm._A = []
 cbar = fig.colorbar(sm)
 plt.savefig('moran.png')
