@@ -23,7 +23,16 @@ def calculate_swing_2024(row, party):
                 largest_nonparty_count = row[item]
     return (party_count - largest_nonparty_count) / 2
 
-            
+def calculate_swing(row, party):
+    largest_nonparty_count = 0
+    party_count = 0
+    for item in row:
+        if item.upper() in Party.__members__:
+            if item.upper() == Party.LD.name:
+                party_count = int(row[item])
+            elif int(row[item]) > largest_nonparty_count:
+                largest_nonparty_count = int(row[item])
+    return (party_count - largest_nonparty_count) / (2 * int(row['valid_votes']))          
 
 
 

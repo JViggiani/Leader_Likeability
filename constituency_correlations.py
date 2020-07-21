@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from political_data import Party, Leader, Region
 from political_utility_functions import format_region, to_serializable, get_num, log_nested_dictionary, zero_negatives
-from political_functions import calculate_swing_2024
+from political_functions import calculate_swing_2024, calculate_swing
 
 ###    GLOBAL ITEMS
 start_time = time.time()
@@ -36,17 +36,6 @@ logging.basicConfig(filename=log_file_name,level=logging.DEBUG)
 ###    END CONFIG
 
 ###    FUNCTION DEFINITIONS
-def calculate_swing(row, party):
-    largest_nonparty_count = 0
-    party_count = 0
-    for item in row:
-        if item.upper() in Party.__members__:
-            if item.upper() == Party.LD.name:
-                party_count = int(row[item])
-            elif int(row[item]) > largest_nonparty_count:
-                largest_nonparty_count = int(row[item])
-    return (party_count - largest_nonparty_count) / (2 * int(row['valid_votes']))
-
 def normalise_vote_shares(leader_vote_shares):
     #Normalise vote shares
     sum_vote_shares = sum(leader_vote_shares.values())
@@ -368,6 +357,8 @@ for row in csv_electiondata_2019:
             #Did not stand in constituency
             continue
         
+        logging.debug("Leader: " + leader.name)
+        
         #Returns a tuple: (average_likeability, party_to_calculate_for_vote_proportion, winning_party)
         average_likeability = calculate_constituency_likeability(row, leader, region, region_likeability)
         party_to_calculate_for_vote_proportion = int(row[party_to_calculate_for.name.lower()]) / int(row["valid_votes"])
@@ -394,6 +385,38 @@ for region_iterator in Region:
         if (leader_iterator == Leader.STURGEON and region_iterator != Region.SCOTLAND) or (leader_iterator == Leader.PRICE and region_iterator != Region.WALES):
             continue
         region_leader_fittings[region_iterator][leader_iterator] = [0, 0]
+
+if config['Correlations_Output']['PrintLikeabilityCsv'].upper() == "TRUE":
+    logging.info("Printing Likeability constituency csv")
+    
+    leader_1 = Leader.from_str(config['Correlations_Input']['LeaderOneLikeability'])
+    leader_2 = Leader.from_str(config['Correlations_Input']['LeaderTwoLikeability'])
+    
+    electiondata_2019 = open(config['Correlations_Input']['ElectionResults2019'])
+    csv_electiondata_2019 = csv.DictReader(electiondata_2019)
+    
+    fieldnames = csv_electiondata_2019.fieldnames
+    fieldnames.append(leader_1.name + "_likeability")
+    fieldnames.append(leader_2.name + "_likeability")
+    
+    output = open(config["Correlations_Output"]["LikeabilityCsv"], 'w', newline='')
+    csv_output = csv.DictWriter(output, fieldnames=fieldnames)
+    csv_output.writeheader()
+    
+    for row in csv_electiondata_2019:
+        if Region.from_str(row["region_name"]) == Region.NORTHERN_IRELAND:
+            continue
+        if (Region.from_str(row["region_name"]) != Region.SCOTLAND and (leader_1 == Leader.STURGEON or leader_2 == Leader.STURGEON)) or (Region.from_str(row["region_name"]) != Region.WALES and (leader_1 == Leader.PRICE or leader_2 == Leader.PRICE)):
+            continue
+        
+        likeability_1 = calculate_constituency_likeability(row, leader_1, Region.from_str(row["region_name"]), region_likeability)
+        likeability_2 = calculate_constituency_likeability(row, leader_2, Region.from_str(row["region_name"]), region_likeability)
+        
+        row[leader_1.name + "_likeability"] = likeability_1
+        row[leader_2.name + "_likeability"] = likeability_2
+        
+        csv_output.writerow(row)
+    output.close()
 
 for region in regional_leader_likeability_votes:
     for leader in leaders_2019:
