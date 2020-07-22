@@ -3,6 +3,51 @@ A data project to calculate seat projections for different leader likeability va
 
 ## Method
 
+The British Election Study releases waves of surveys, usually once a year or multiple times a year in election years. Wave 19 was released shortly after the 2019 election, and you can find the data here: https://www.britishelectionstudy.com/data-object/wave-19-of-the-2014-2023-british-election-study-internet-panel/
+
+The study, among other things, asked interviewees their opinions on then-party leaders, as well as their opinions on Starmer, Davey and Moran. Specifically, the interviewees were asked to rate each leader out of 10.
+
+The first step (in likeability.py) is to process this data into a regional breakdown. For each respondent, their region is noted (South-East, Wales, East etc..), as well as the party they voted for and their opinion on each leader. This is aggregated into a likeability Json, whose structure takes the following form:
+
+Region (eg South-West)
+	
+	Party Voted (eg Labour)
+	
+		Leader Likeability (eg Farage)
+			
+			(Sum Likeability, Total Weight)
+			
+By later dividing the sum likeability by the total weight, the above example tells us what the average Labour voter in the South-West thinks of Farage. The total weight is used instead of the number of respondants, and this is based on the YouGov weighting algorithm, provided in the wave 19 data. This is repeated for every combination of region, party voted and leader opinion in order to get a complete likeability matrix. 
+
+The next step (in constituency_correlations.py) is to go through the results of the 2019 election, as provided by the House of Commons library: https://commonslibrary.parliament.uk/research-briefings/cbp-8749/
+
+For each constituency, the "average likeability" for each leader is calculated by considering vote shares. 
+
+For example, we can say that "West Placeshire" in the North-West voted 45% Conservative, 35% Labour and 20% Liberal Democrat. The average Conservative voter in the North-West gave Swinson a 3/10. The average Labour voter gave a 4/10 and the average Liberal Democrat gave 7/10. Therefore, the average likeability in West Placeshire is the weighted average of these, 4.15/10
+
+Then, we can scatter these constituencies on graphs which plot the vote share of the party versus the likeability of the leader. 
+
+For example, in London, Swinson's various likeabilities netted her the following vote shares:
+
+![Liberal Democrat vote share in London constituencies mapped against Jo Swinson's likeability. Constituencies are coloured by their 2019 result.](https://i.imgur.com/0ldUkLe.png)
+
+These measurements can be repeated for each region, for each leader, to get 68 other such scatter graphs, which you can view here: https://imgur.com/a/b2o5Hey
+
+Using the same correlation equations (y = mx + c), we can recalculate each constituency's likeability for Starmer, Moran and Davey in order to get the implied voter share for their parties if they were leader
+
+Of course, from the above graph you can see that if hypothetically Davey found himself in a London constituency where his likeability was below 2.5, he would net himself a negative vote share due to being below the x-intercept, which is obviously impossible. 
+
+To combat this, the raw predicted projections were compared to the actual 2019 results, in order to get a linear likeability offset for each constituency. For example the prediction in, say, "North Placedon" might predict a vote share of -0.05, but the real vote share was actually +0.07, so the offset here is +0.12. 
+
+Then, the model was reapplied with these offsets in order to get two "base" scenarios to work from - one where Davey leads the LibDems and one where Moran does. Starmer, Johnson, Sturgeon etc are all assumed to be around in 2024 so their likeabilities were reused. 
+
+There was an obvious problem. Starmer was far too popular after the election, in the context of Corbyn, and Davey/Moran were quite similar to Swinson. The raw base scenario predicted a Labour landslide on the scale of 500 or so seats. During the course of a campaign this is obviously very unrealistic. The best way to combat this was to apply a linear swing from the top down (calculate_linear_swing.py) based upon desired party vote shares. 
+
+This produced csv files similar to the original 2019 election results as provided by the HoC Library. These CSV files were mapped on Flourish.
+
+The likeability visualisations were mapped using the optional PrintLikeabilityCsv config parameter in constituency_correlations. The likeability comparison visualisation data was calculated in compare_likeability.py. The projection comparison between leaders was calculated using compare_results.py.
+
+
 ## Flourish Visualisations
 
 All visualisations were created with Flourish Studio: https://flourish.studio/
