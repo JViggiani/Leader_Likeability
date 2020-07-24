@@ -63,6 +63,11 @@ projection_one_name = config['Compare_Input']['NameOne']
 
 fieldnames = ['ons_id', 'ons_region_id', 'constituency_name', 'region_name', 'result_2024_' + projection_one_name, 'first_party_2024_' + projection_one_name, 'second_party_2024_' + projection_one_name, 'result_2024_' + projection_two_name, 'first_party_2024_' + projection_two_name, 'second_party_2024_' + projection_two_name, 'compared_result', 'compared_second']
 
+optional_average = False
+
+if config['Compare_Input']['FromAverage'].upper() == "TRUE": 
+    optional_average = True
+
 output = open(config["Compare_Output"]["ComparisonOutput"], 'w', newline='')
 csv_output = csv.DictWriter(output, fieldnames=fieldnames)
 csv_output.writeheader()
@@ -75,13 +80,20 @@ for row_one in csv_projection_one:
     new_row['constituency_name'] = row_one['constituency_name']
     new_row['region_name'] = row_one['region_name']
     
-    new_row['result_2024_' + projection_one_name] = row_one['result_2024']
-    new_row['first_party_2024_' + projection_one_name] = row_one['first_party_2024']
-    new_row['second_party_2024_' + projection_one_name] = row_one['second_party_2024']
-    
-    new_row['result_2024_' + projection_two_name] = constituency_two_dict[row_one["constituency_name"]]['result_2024']
-    new_row['first_party_2024_' + projection_two_name] = constituency_two_dict[row_one["constituency_name"]]['first_party_2024']
-    new_row['second_party_2024_' + projection_two_name] = constituency_two_dict[row_one["constituency_name"]]['second_party_2024']
+    if optional_average == True:
+        new_row['first_party_2024_' + projection_one_name] = row_one['first_party_fromaverage']
+        new_row['second_party_2024_' + projection_one_name] = row_one['second_party_fromaverage']
+        
+        new_row['first_party_2024_' + projection_two_name] = constituency_two_dict[row_one["constituency_name"]]['first_party_fromaverage']
+        new_row['second_party_2024_' + projection_two_name] = constituency_two_dict[row_one["constituency_name"]]['second_party_fromaverage']
+    else:
+        new_row['result_2024_' + projection_one_name] = row_one['result_2024']
+        new_row['first_party_2024_' + projection_one_name] = row_one['first_party_2024']
+        new_row['second_party_2024_' + projection_one_name] = row_one['second_party_2024']
+        
+        new_row['result_2024_' + projection_two_name] = constituency_two_dict[row_one["constituency_name"]]['result_2024']
+        new_row['first_party_2024_' + projection_two_name] = constituency_two_dict[row_one["constituency_name"]]['first_party_2024']
+        new_row['second_party_2024_' + projection_two_name] = constituency_two_dict[row_one["constituency_name"]]['second_party_2024']
     
     compared_result = ''
 

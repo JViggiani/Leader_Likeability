@@ -64,15 +64,37 @@ Davey/Moran All: https://public.flourish.studio/visualisation/3206298/
 
 Davey/Moran Targets: https://public.flourish.studio/visualisation/3208818/
 
+Davey/Johnson All: https://public.flourish.studio/visualisation/3278874/
+
 Davey/Johnson Targets: https://public.flourish.studio/visualisation/3209419/
+
+Moran/Johnson All: https://public.flourish.studio/visualisation/3278847/
 
 Moran/Johnson Targets: https://public.flourish.studio/visualisation/3209604/
 
 Davey/Starmer All: https://public.flourish.studio/visualisation/3209632/
 
+Davey/Starmer Targets: https://public.flourish.studio/visualisation/3278711/
+
 Moran/Starmer All: https://public.flourish.studio/visualisation/3209693/
 
+Moran/Starmer Targets: https://public.flourish.studio/visualisation/3278833/
+
 ### Scenarios
+
+#### Aggregates
+
+Aggregate, Davey, Projection: https://public.flourish.studio/visualisation/3258420/
+
+Aggregate, Davey, Second: https://public.flourish.studio/visualisation/3258520/
+
+Aggregate, Moran, Projection: https://public.flourish.studio/visualisation/3258526/
+
+Aggregate, Moran, Second: https://public.flourish.studio/visualisation/3258560/
+
+Aggregate, Comparison, Projection: https://public.flourish.studio/visualisation/3258582/
+
+Aggregate, Comparison, Second: https://public.flourish.studio/visualisation/3258605/
 
 #### Scenario 1
 
