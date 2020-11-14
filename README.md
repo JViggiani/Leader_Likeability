@@ -1,5 +1,10 @@
+
 # Leader_Likeability
-A data project to calculate seat projections for different leader likeability values
+A data project to calculate seat projections for different leader likeability values. The colloquial writeup article is available here:
+
+https://medium.com/@JoshuaViggiani/the-liberal-democrats-face-an-uphill-battle-but-which-leader-can-win-here-869028670103
+
+This Readme will cover more technical aspects. 
 
 ## Method
 
